@@ -111,10 +111,15 @@ function convertAllFiles(inputFolder, outputFolder, namespace) {
       allI18n.en[`item.${namespace}.${key}`] = name
     }
 
-    // Create subcategory per file
+    // Create subcategory per file with checker
     const subCategoryName = path.parse(relativePath).name
     const subCategoryKey = `${namespace}:${subCategoryName}`
-    const itemKeys = Object.keys(nexoData).map(k => `${namespace}:${k}`)
+
+    const itemKeys = Object.keys(nexoData)
+      .map(k => `${namespace}:${k}`)
+      .filter(k => craftData.items[k]) // only include converted items
+
+    if (itemKeys.length === 0) return // skip empty subcategory
 
     categories[subCategoryKey] = {
       name: `<!i><green><i18n:category.${namespace}.${subCategoryName}></green>`,
@@ -126,7 +131,7 @@ function convertAllFiles(inputFolder, outputFolder, namespace) {
     // Subcategory i18n
     allI18n.en[`category.${namespace}.${subCategoryName}`] = subCategoryName
 
-    // Add subcategory reference to main category
+    // Add subcategory reference to main category only if it has items
     categories[mainCategoryKey].list.push(`#${subCategoryKey}`)
 
     // Set main category icon fallback if not set yet
