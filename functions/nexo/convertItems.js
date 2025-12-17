@@ -14,49 +14,53 @@ function loggerDuplicates(level, message) {
   log(message, level, 'nexoduplicates')
 }
 
+function loggerSameIds(level, message) {
+  log(message, level, 'nexosameids')
+}
+
 /**
  * Convert Nexo item data to CraftEngine format
  * Supports 3D and 2D items
  */
-function convertNexoToCraft(itemData, namespace, cmdTracker = {}) {
+function convertNexoToCraft(itemData, namespace, cmdTracker = {}, cmdConflicts = {}) {
   const craftItems = { items: {} }
 
   for (const key in itemData) {
     const item = itemData[key]
     const pack = item.Pack || {}
     const material = item.material.toUpperCase()
+    const cmd = pack.custom_model_data
 
     // Track CMD for material
     if (!cmdTracker[material]) cmdTracker[material] = []
-    if (pack.custom_model_data) cmdTracker[material].push(pack.custom_model_data)
+    if (cmd) cmdTracker[material].push(cmd)
+
+    // Track CMD conflicts
+    if (cmd) {
+      if (!cmdConflicts[material]) cmdConflicts[material] = {}
+      if (cmdConflicts[material][cmd]) {
+        // Conflict found: same CMD already used
+        loggerSameIds('warn', `Conflict detected for CMD ${cmd} on material ${material} between items '${cmdConflicts[material][cmd]}' and '${key}'`)
+      } else {
+        cmdConflicts[material][cmd] = key
+      }
+    }
 
     if (pack.generate_model === false) {
       // 3D item
       craftItems.items[`${namespace}:${key}`] = {
-        'custom-model-data': pack.custom_model_data,
+        'custom-model-data': cmd,
         material,
-        data: {
-          'item-name': `<!i><white><i18n:item.${namespace}.${key}></white>`
-        },
-        model: {
-          type: 'minecraft:model',
-          path: pack.model
-        }
+        data: { 'item-name': `<!i><white><i18n:item.${namespace}.${key}></white>` },
+        model: { type: 'minecraft:model', path: pack.model }
       }
     } else if (pack.texture) {
       // 2D item
       craftItems.items[`${namespace}:${key}`] = {
-        'custom-model-data': pack.custom_model_data,
+        'custom-model-data': cmd,
         material,
-        data: {
-          'item-name': `<!i><white><i18n:item.${namespace}.${key}></white>`
-        },
-        model: {
-          template: `${namespace}:model/simplified_generated`,
-          arguments: {
-            path: pack.texture
-          }
-        }
+        data: { 'item-name': `<!i><white><i18n:item.${namespace}.${key}></white>` },
+        model: { template: `${namespace}:model/simplified_generated`, arguments: { path: pack.texture } }
       }
     }
   }
@@ -139,6 +143,7 @@ function convertAllFiles(inputFolder, outputFolder, namespace) {
   const allI18n = { en: {} }
   const categories = {}
   const cmdTracker = {}
+  const cmdConflicts = {}
   const existingItems = new Set()
 
   // Main namespace category
@@ -188,7 +193,7 @@ function convertAllFiles(inputFolder, outputFolder, namespace) {
       }
 
       // Convert items (3D + 2D)
-      const craftData = convertNexoToCraft(filteredData, namespace, cmdTracker)
+      const craftData = convertNexoToCraft(filteredData, namespace, cmdTracker, cmdConflicts)
       writeYaml(outputPath, craftData)
       loggerNexo('info', `Wrote CraftEngine items to: ${outputPath}`)
 
