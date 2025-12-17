@@ -57,15 +57,19 @@ function convertNexoToCraft(itemData, namespace) {
 }
 
 /**
- * Recursively find all .yml/.yaml files in a folder
+ * Recursively find all .yml/.yaml files in a folder, ignoring blacklisted folders
  */
-function getYamlFilesRecursive(folder) {
+function getYamlFilesRecursive(folder, blacklist = []) {
   let results = []
   const entries = fs.readdirSync(folder, { withFileTypes: true })
   for (const entry of entries) {
     const fullPath = path.join(folder, entry.name)
     if (entry.isDirectory()) {
-      results = results.concat(getYamlFilesRecursive(fullPath))
+      if (blacklist.includes(entry.name)) {
+        loggerNexo('warn', `Skipped blacklisted folder: ${fullPath}`)
+        continue
+      }
+      results = results.concat(getYamlFilesRecursive(fullPath, blacklist))
     } else if (entry.isFile() && (entry.name.endsWith('.yml') || entry.name.endsWith('.yaml'))) {
       results.push(fullPath)
     }
@@ -83,7 +87,11 @@ function convertAllFiles(inputFolder, outputFolder, namespace) {
     return
   }
 
-  const files = getYamlFilesRecursive(itemsFolder)
+  const folderBlacklist = [
+    'nexo_defaults',
+  ]
+
+  const files = getYamlFilesRecursive(itemsFolder, folderBlacklist)
   loggerNexo('info', `Found ${files.length} YAML files to process.`)
 
   const allI18n = { en: {} }
