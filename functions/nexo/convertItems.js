@@ -10,6 +10,10 @@ function loggerNexo(level, message) {
   log(message, level, 'nexoitems')
 }
 
+function loggerDuplicates(level, message) {
+  log(message, level, 'nexoduplicates')
+}
+
 /**
  * Convert Nexo item data to CraftEngine format
  * Supports 3D and 2D items
@@ -135,6 +139,7 @@ function convertAllFiles(inputFolder, outputFolder, namespace) {
   const allI18n = { en: {} }
   const categories = {}
   const cmdTracker = {}
+  const existingItems = new Set()
 
   // Main namespace category
   const mainCategoryKey = `${namespace}:${namespace}`
@@ -165,14 +170,31 @@ function convertAllFiles(inputFolder, outputFolder, namespace) {
         return
       }
 
+      // Filter out duplicated items
+      const filteredData = {}
+      for (const key in nexoData) {
+        const itemKey = `${namespace}:${key}`
+        if (existingItems.has(itemKey)) {
+          loggerDuplicates('warn', `Skipped duplicate item '${itemKey}' in file ${file}`)
+          continue
+        }
+        filteredData[key] = nexoData[key]
+        existingItems.add(itemKey)
+      }
+
+      if (Object.keys(filteredData).length === 0) {
+        loggerDuplicates('warn', `All items in ${file} are duplicates, skipping file.`)
+        return
+      }
+
       // Convert items (3D + 2D)
-      const craftData = convertNexoToCraft(nexoData, namespace, cmdTracker)
+      const craftData = convertNexoToCraft(filteredData, namespace, cmdTracker)
       writeYaml(outputPath, craftData)
       loggerNexo('info', `Wrote CraftEngine items to: ${outputPath}`)
 
       // Generate i18n entries for items
-      for (const key in nexoData) {
-        const name = nexoData[key].itemname || key
+      for (const key in filteredData) {
+        const name = filteredData[key].itemname || key
         allI18n.en[`item.${namespace}.${key}`] = name
       }
 
@@ -180,7 +202,7 @@ function convertAllFiles(inputFolder, outputFolder, namespace) {
       const subCategoryName = path.parse(relativePath).name
       const subCategoryKey = `${namespace}:${subCategoryName}`
 
-      const itemKeys = Object.keys(nexoData)
+      const itemKeys = Object.keys(filteredData)
         .map(k => `${namespace}:${k}`)
         .filter(k => craftData.items[k]) // only include converted items
 
