@@ -38,8 +38,16 @@ function initFolders() {
   })
 }
 
+function deleteFolder(folderPath) {
+  if (fs.existsSync(folderPath)) {
+    fs.rmSync(folderPath, { recursive: true, force: true })
+    loggerMain('info', `Deleted folder: ${folderPath}`)
+  }
+}
+
 function startup() {
   clearLogs()
+  deleteFolder(outputFolderPath)
   loggerStartup('info', 'Starting application...')
   initFolders()
   loggerStartup('info', 'Startup complete.')
