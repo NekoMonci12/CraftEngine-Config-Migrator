@@ -231,7 +231,8 @@ function convertAllFiles(inputFolder, outputFolder, namespace) {
 
       // Set main category icon fallback if not set yet
       if (!mainCategoryIconSet && itemKeys.length > 0) {
-        categories[mainCategoryKey].icon = itemKeys[0]
+        const logoItem = itemKeys.find(k => k.toLowerCase().includes('logo'))
+        categories[mainCategoryKey].icon = logoItem || itemKeys[0]
         mainCategoryIconSet = true
       }
 
