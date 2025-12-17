@@ -53,9 +53,42 @@ function copyFolderRecursive(src, dest, blacklist = [], whitelist = []) {
 }
 
 /**
- * Handle Nexo pack folder
+ * Generate atlas JSON for all folders under "pack/assets/minecraft/textures"
+ * @param {string} outputFolder - Root output folder
+ */
+function generateTextureAtlas(outputFolder) {
+  const texturesFolder = path.join(outputFolder, 'resourcepack', 'assets', 'minecraft', 'textures')
+  const atlasFolder = path.join(outputFolder, 'resourcepack', 'assets', 'minecraft', 'atlases')
+  const atlasFile = path.join(atlasFolder, 'blocks.json')
+
+  if (!fs.existsSync(texturesFolder)) {
+    loggerNexoAssets('warn', `Textures folder not found: ${texturesFolder}`)
+    return
+  }
+
+  fs.mkdirSync(atlasFolder, { recursive: true })
+
+  const subfolders = fs.readdirSync(texturesFolder, { withFileTypes: true })
+    .filter(d => d.isDirectory())
+    .map(d => d.name)
+
+  const sources = subfolders.map(name => ({
+    type: 'directory',
+    source: name,
+    prefix: `${name}/`
+  }))
+
+  const atlasData = { sources }
+
+  fs.writeFileSync(atlasFile, JSON.stringify(atlasData, null, 4), 'utf8')
+  loggerNexoAssets('info', `Generated texture atlas at: ${atlasFile}`)
+}
+
+/**
+ * Handle Nexo pack assets
  * Copies input/pack/assets -> output/resourcepack/assets
  * Skips blacklisted paths and only allows whitelisted file types
+ * Generates texture atlas JSON
  * @param {string} inputFolder - Root input folder
  * @param {string} outputFolder - Root output folder
  */
@@ -82,6 +115,7 @@ function convertAssets(inputFolder, outputFolder) {
 
   copyFolderRecursive(srcFolder, destFolder, blacklist, whitelist)
   loggerNexoAssets('info', `Pack assets copied to: ${destFolder}`)
+  generateTextureAtlas(outputFolder)
 }
 
-module.exports = { convertAssets }
+module.exports = { convertAssets, generateTextureAtlas }
