@@ -1,6 +1,14 @@
 const fs = require('fs')
 const path = require('path')
 const { readYaml, writeYaml } = require('../yamlHelper')
+const { log } = require('../logger')
+
+/**
+ * Logger for Nexo item conversion
+ */
+function loggerNexo(level, message) {
+  log(message, level, 'nexoitems')
+}
 
 /**
  * Convert Nexo item data to CraftEngine format
@@ -44,6 +52,7 @@ function convertNexoToCraft(itemData, namespace) {
     }
   }
 
+  loggerNexo('info', `Converted ${Object.keys(craftItems.items).length} items to CraftEngine format.`)
   return craftItems
 }
 
@@ -69,9 +78,13 @@ function getYamlFilesRecursive(folder) {
  */
 function convertAllFiles(inputFolder, outputFolder, namespace) {
   const itemsFolder = path.join(inputFolder, 'items')
-  if (!fs.existsSync(itemsFolder)) return
+  if (!fs.existsSync(itemsFolder)) {
+    loggerNexo('warn', `Input items folder not found: ${itemsFolder}`)
+    return
+  }
 
   const files = getYamlFilesRecursive(itemsFolder)
+  loggerNexo('info', `Found ${files.length} YAML files to process.`)
 
   const allI18n = { en: {} }
   const categories = {}
@@ -99,11 +112,15 @@ function convertAllFiles(inputFolder, outputFolder, namespace) {
     fs.mkdirSync(path.dirname(outputPath), { recursive: true })
 
     const nexoData = readYaml(file)
-    if (!nexoData) return
+    if (!nexoData) {
+      loggerNexo('warn', `Failed to read YAML: ${file}`)
+      return
+    }
 
     // Convert items (3D + 2D)
     const craftData = convertNexoToCraft(nexoData, namespace)
     writeYaml(outputPath, craftData)
+    loggerNexo('info', `Wrote CraftEngine items to: ${outputPath}`)
 
     // Generate i18n entries for items
     for (const key in nexoData) {
@@ -119,7 +136,10 @@ function convertAllFiles(inputFolder, outputFolder, namespace) {
       .map(k => `${namespace}:${k}`)
       .filter(k => craftData.items[k]) // only include converted items
 
-    if (itemKeys.length === 0) return // skip empty subcategory
+    if (itemKeys.length === 0) {
+      loggerNexo('warn', `Skipping empty subcategory: ${subCategoryKey}`)
+      return
+    }
 
     categories[subCategoryKey] = {
       name: `<!i><green><i18n:category.${namespace}.${subCategoryName}></green>`,
@@ -139,15 +159,19 @@ function convertAllFiles(inputFolder, outputFolder, namespace) {
       categories[mainCategoryKey].icon = itemKeys[0]
       mainCategoryIconSet = true
     }
+
+    loggerNexo('info', `Created subcategory: ${subCategoryKey} with ${itemKeys.length} items`)
   })
 
   const configurationFolder = path.join(outputFolder, 'configuration')
 
   // Write i18n.yml
   writeYaml(path.join(configurationFolder, 'i18n.yml'), { i18n: allI18n })
+  loggerNexo('info', 'Wrote i18n.yml')
 
   // Write categories.yml
   writeYaml(path.join(configurationFolder, 'categories.yml'), { categories })
+  loggerNexo('info', 'Wrote categories.yml')
 
   // Write templates.yml
   const templates = {
@@ -172,6 +196,7 @@ function convertAllFiles(inputFolder, outputFolder, namespace) {
   }
 
   writeYaml(path.join(configurationFolder, 'templates.yml'), templates)
+  loggerNexo('info', 'Wrote templates.yml')
 }
 
 module.exports = { convertNexoToCraft, convertAllFiles }
