@@ -4,6 +4,7 @@ const { log, clearLogs } = require('./functions/logger')
 const fs = require('fs')
 const path = require('path')
 const { convertAllFiles } = require('./functions/nexo/convertItems')
+const { convertAssets } = require('./functions/nexo/convertAssets')
 
 inputFolderName = 'input'
 outputFolderName = 'output'
@@ -43,6 +44,7 @@ function startup() {
 function main() {
   startup()
   convertAllFiles(inputFolderPath, outputFolderPath, namespace)
+  convertAssets(inputFolderPath, outputFolderPath)
 }
 
 main()
