@@ -3,8 +3,14 @@ const { env } = require('process')
 const { log, clearLogs } = require('./functions/logger')
 const fs = require('fs')
 const path = require('path')
+const { convertAllFiles } = require('./functions/convertNexo')
 
-const folders = ['logs', 'input', 'output']
+inputFolderName = 'input'
+outputFolderName = 'output'
+const inputFolderPath = path.join(__dirname, inputFolderName)
+const outputFolderPath = path.join(__dirname, outputFolderName)
+
+const folders = ['logs', inputFolderName, outputFolderName]
 const namespace = env.NAMESPACE || 'minecraft'
 
 function loggerMain(level, message) {
@@ -36,6 +42,7 @@ function startup() {
 
 function main() {
   startup()
+  convertAllFiles(inputFolderPath, outputFolderPath, namespace)
 }
 
 main()
