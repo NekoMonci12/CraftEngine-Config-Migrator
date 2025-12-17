@@ -106,61 +106,65 @@ function convertAllFiles(inputFolder, outputFolder, namespace) {
   let mainCategoryIconSet = false
 
   files.forEach(file => {
-    // Maintain subfolder structure in output
-    const relativePath = path.relative(itemsFolder, file)
-    const outputPath = path.join(outputFolder, 'configuration', 'items', relativePath)
-    fs.mkdirSync(path.dirname(outputPath), { recursive: true })
+    try {
+      // Maintain subfolder structure in output
+      const relativePath = path.relative(itemsFolder, file)
+      const outputPath = path.join(outputFolder, 'configuration', 'items', relativePath)
+      fs.mkdirSync(path.dirname(outputPath), { recursive: true })
 
-    const nexoData = readYaml(file)
-    if (!nexoData) {
-      loggerNexo('warn', `Failed to read YAML: ${file}`)
-      return
+      const nexoData = readYaml(file)
+      if (!nexoData) {
+        loggerNexo('warn', `Failed to read YAML: ${file}`)
+        return
+      }
+
+      // Convert items (3D + 2D)
+      const craftData = convertNexoToCraft(nexoData, namespace)
+      writeYaml(outputPath, craftData)
+      loggerNexo('info', `Wrote CraftEngine items to: ${outputPath}`)
+
+      // Generate i18n entries for items
+      for (const key in nexoData) {
+        const name = nexoData[key].itemname || key
+        allI18n.en[`item.${namespace}.${key}`] = name
+      }
+
+      // Create subcategory per file with checker
+      const subCategoryName = path.parse(relativePath).name
+      const subCategoryKey = `${namespace}:${subCategoryName}`
+
+      const itemKeys = Object.keys(nexoData)
+        .map(k => `${namespace}:${k}`)
+        .filter(k => craftData.items[k]) // only include converted items
+
+      if (itemKeys.length === 0) {
+        loggerNexo('warn', `Skipping empty subcategory: ${subCategoryKey}`)
+        return
+      }
+
+      categories[subCategoryKey] = {
+        name: `<!i><green><i18n:category.${namespace}.${subCategoryName}></green>`,
+        hidden: true,
+        icon: itemKeys[0] || '',
+        list: itemKeys
+      }
+
+      // Subcategory i18n
+      allI18n.en[`category.${namespace}.${subCategoryName}`] = subCategoryName
+
+      // Add subcategory reference to main category only if it has items
+      categories[mainCategoryKey].list.push(`#${subCategoryKey}`)
+
+      // Set main category icon fallback if not set yet
+      if (!mainCategoryIconSet && itemKeys.length > 0) {
+        categories[mainCategoryKey].icon = itemKeys[0]
+        mainCategoryIconSet = true
+      }
+
+      loggerNexo('info', `Created subcategory: ${subCategoryKey} with ${itemKeys.length} items`)
+    } catch (error) {
+      loggerNexo('error', `Error processing file ${file}: ${error.message}`)
     }
-
-    // Convert items (3D + 2D)
-    const craftData = convertNexoToCraft(nexoData, namespace)
-    writeYaml(outputPath, craftData)
-    loggerNexo('info', `Wrote CraftEngine items to: ${outputPath}`)
-
-    // Generate i18n entries for items
-    for (const key in nexoData) {
-      const name = nexoData[key].itemname || key
-      allI18n.en[`item.${namespace}.${key}`] = name
-    }
-
-    // Create subcategory per file with checker
-    const subCategoryName = path.parse(relativePath).name
-    const subCategoryKey = `${namespace}:${subCategoryName}`
-
-    const itemKeys = Object.keys(nexoData)
-      .map(k => `${namespace}:${k}`)
-      .filter(k => craftData.items[k]) // only include converted items
-
-    if (itemKeys.length === 0) {
-      loggerNexo('warn', `Skipping empty subcategory: ${subCategoryKey}`)
-      return
-    }
-
-    categories[subCategoryKey] = {
-      name: `<!i><green><i18n:category.${namespace}.${subCategoryName}></green>`,
-      hidden: true,
-      icon: itemKeys[0] || '',
-      list: itemKeys
-    }
-
-    // Subcategory i18n
-    allI18n.en[`category.${namespace}.${subCategoryName}`] = subCategoryName
-
-    // Add subcategory reference to main category only if it has items
-    categories[mainCategoryKey].list.push(`#${subCategoryKey}`)
-
-    // Set main category icon fallback if not set yet
-    if (!mainCategoryIconSet && itemKeys.length > 0) {
-      categories[mainCategoryKey].icon = itemKeys[0]
-      mainCategoryIconSet = true
-    }
-
-    loggerNexo('info', `Created subcategory: ${subCategoryKey} with ${itemKeys.length} items`)
   })
 
   const configurationFolder = path.join(outputFolder, 'configuration')
