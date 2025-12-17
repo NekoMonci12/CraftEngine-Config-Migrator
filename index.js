@@ -3,7 +3,7 @@ const { env } = require('process')
 const { log, clearLogs } = require('./functions/logger')
 const fs = require('fs')
 const path = require('path')
-const { convertAllFiles } = require('./functions/convertNexo')
+const { convertAllFiles } = require('./functions/nexo/convertItems')
 
 inputFolderName = 'input'
 outputFolderName = 'output'
