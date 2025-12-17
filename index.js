@@ -1,8 +1,11 @@
+require('dotenv').config()
+const { env } = require('process')
 const { log, clearLogs } = require('./functions/logger')
 const fs = require('fs')
 const path = require('path')
 
 const folders = ['logs', 'input', 'output']
+const namespace = env.NAMESPACE || 'minecraft'
 
 function loggerMain(level, message) {
   log(message, level, 'main')
