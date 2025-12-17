@@ -14,18 +14,23 @@ function loggerNexo(level, message) {
  * Convert Nexo item data to CraftEngine format
  * Supports 3D and 2D items
  */
-function convertNexoToCraft(itemData, namespace) {
+function convertNexoToCraft(itemData, namespace, cmdTracker = {}) {
   const craftItems = { items: {} }
 
   for (const key in itemData) {
     const item = itemData[key]
     const pack = item.Pack || {}
+    const material = item.material.toUpperCase()
+
+    // Track CMD for material
+    if (!cmdTracker[material]) cmdTracker[material] = []
+    if (pack.custom_model_data) cmdTracker[material].push(pack.custom_model_data)
 
     if (pack.generate_model === false) {
       // 3D item
       craftItems.items[`${namespace}:${key}`] = {
         'custom-model-data': pack.custom_model_data,
-        material: item.material,
+        material,
         data: {
           'item-name': `<!i><white><i18n:item.${namespace}.${key}></white>`
         },
@@ -38,7 +43,7 @@ function convertNexoToCraft(itemData, namespace) {
       // 2D item
       craftItems.items[`${namespace}:${key}`] = {
         'custom-model-data': pack.custom_model_data,
-        material: item.material,
+        material,
         data: {
           'item-name': `<!i><white><i18n:item.${namespace}.${key}></white>`
         },
@@ -78,6 +83,39 @@ function getYamlFilesRecursive(folder, blacklist = []) {
 }
 
 /**
+ * Write CMD ranges to id-range.txt
+ */
+function writeCmdRanges(outputFolder, cmdTracker) {
+  const lines = []
+
+  for (const material in cmdTracker) {
+    const ids = cmdTracker[material].sort((a, b) => a - b)
+    if (!ids.length) continue
+
+    let rangeStart = ids[0]
+    let rangeEnd = ids[0]
+
+    const ranges = []
+
+    for (let i = 1; i < ids.length; i++) {
+      if (ids[i] === rangeEnd + 1) {
+        rangeEnd = ids[i]
+      } else {
+        ranges.push(rangeStart === rangeEnd ? `${rangeStart}` : `${rangeStart}-${rangeEnd}`)
+        rangeStart = rangeEnd = ids[i]
+      }
+    }
+    ranges.push(rangeStart === rangeEnd ? `${rangeStart}` : `${rangeStart}-${rangeEnd}`)
+
+    lines.push(`${material}: ${ranges.join(', ')}`)
+  }
+
+  const filePath = path.join(outputFolder, 'id-range.txt')
+  fs.writeFileSync(filePath, lines.join('\n'), 'utf8')
+  loggerNexo('info', `Wrote custom model data ranges to: ${filePath}`)
+}
+
+/**
  * Convert all Nexo YAML files in inputFolder/items to CraftEngine format in outputFolder/configuration
  */
 function convertAllFiles(inputFolder, outputFolder, namespace) {
@@ -96,6 +134,7 @@ function convertAllFiles(inputFolder, outputFolder, namespace) {
 
   const allI18n = { en: {} }
   const categories = {}
+  const cmdTracker = {}
 
   // Main namespace category
   const mainCategoryKey = `${namespace}:${namespace}`
@@ -127,7 +166,7 @@ function convertAllFiles(inputFolder, outputFolder, namespace) {
       }
 
       // Convert items (3D + 2D)
-      const craftData = convertNexoToCraft(nexoData, namespace)
+      const craftData = convertNexoToCraft(nexoData, namespace, cmdTracker)
       writeYaml(outputPath, craftData)
       loggerNexo('info', `Wrote CraftEngine items to: ${outputPath}`)
 
@@ -209,6 +248,7 @@ function convertAllFiles(inputFolder, outputFolder, namespace) {
 
   writeYaml(path.join(configurationFolder, 'templates.yml'), templates)
   loggerNexo('info', 'Wrote templates.yml')
+  writeCmdRanges(outputFolder, cmdTracker)
 }
 
 module.exports = { convertNexoToCraft, convertAllFiles }
