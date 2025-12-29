@@ -161,8 +161,8 @@ function convertAllFiles(inputFolder, outputFolder, namespace) {
   allI18n.en[`category.${namespace}.name`] = namespace
   allI18n.en[`category.${namespace}.lore`] = `${namespace} Items`
 
-  // Track first item for fallback main category icon
-  let mainCategoryIconSet = false
+  // Prepare to set main category icon
+  let mainCategoryLogoCandidate = '';
 
   files.forEach(file => {
     try {
@@ -231,11 +231,10 @@ function convertAllFiles(inputFolder, outputFolder, namespace) {
       // Add subcategory reference to main category only if it has items
       categories[mainCategoryKey].list.push(`#${subCategoryKey}`)
 
-      // Set main category icon fallback if not set yet
-      if (!mainCategoryIconSet && itemKeys.length > 0) {
-        const logoItem = itemKeys.find(k => k.toLowerCase().includes('logo'))
-        categories[mainCategoryKey].icon = logoItem || itemKeys[0]
-        mainCategoryIconSet = true
+      // Track a logo item for main category icon
+      if (!mainCategoryLogoCandidate && itemKeys.length > 0) {
+          const logoItem = itemKeys.find(k => k.toLowerCase().includes('logo'));
+          if (logoItem) mainCategoryLogoCandidate = logoItem;
       }
 
       loggerNexo('info', `Created subcategory: ${subCategoryKey} with ${itemKeys.length} items`)
@@ -243,6 +242,8 @@ function convertAllFiles(inputFolder, outputFolder, namespace) {
       loggerNexo('error', `Error processing file ${file}: ${error.message}`)
     }
   })
+
+  categories[mainCategoryKey].icon = mainCategoryLogoCandidate || categories[mainCategoryKey].list[0] || '';
 
   const configurationFolder = path.join(outputFolder, 'configuration')
 
