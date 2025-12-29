@@ -46,13 +46,15 @@ function convertNexoToCraft(itemData, namespace, cmdTracker = {}, cmdConflicts =
       }
     }
 
+    const sanitizePath = (path) => path ? path.replace(/\.[^/.]+$/, "") : path
+
     if (pack.generate_model === false) {
       // 3D item
       craftItems.items[`${namespace}:${key}`] = {
         'custom-model-data': cmd,
         material,
         data: { 'item-name': `<!i><white><i18n:item.${namespace}.${key}></white>` },
-        model: { type: 'minecraft:model', path: pack.model }
+        model: { type: 'minecraft:model', path: sanitizePath(pack.model) }
       }
     } else if (pack.texture) {
       // 2D item
@@ -60,7 +62,7 @@ function convertNexoToCraft(itemData, namespace, cmdTracker = {}, cmdConflicts =
         'custom-model-data': cmd,
         material,
         data: { 'item-name': `<!i><white><i18n:item.${namespace}.${key}></white>` },
-        model: { template: `${namespace}:model/simplified_generated`, arguments: { path: pack.texture } }
+        model: { template: `${namespace}:model/simplified_generated`, arguments: { path: sanitizePath(pack.texture) } }
       }
     }
   }
