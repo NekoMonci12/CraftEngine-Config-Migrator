@@ -28,6 +28,8 @@ function convertNexoToCraft(itemData, namespace, cmdTracker = {}, cmdConflicts =
   for (const key in itemData) {
     const item = itemData[key]
     const pack = item.Pack || {}
+    const components = item.Components || {}
+    const mechanics = item.Mechanics || {}
     const material = item.material.toUpperCase()
     const cmd = pack.custom_model_data
 
@@ -64,6 +66,10 @@ function convertNexoToCraft(itemData, namespace, cmdTracker = {}, cmdConflicts =
         data: { 'item-name': `<!i><white><i18n:item.${namespace}.${key}></white>` },
         model: { template: `${namespace}:model/simplified_generated`, arguments: { path: sanitizePath(pack.texture) } }
       }
+    } else if (pack.CustomArmor) {
+      // TODO: Handle Custom Armor Conversion
+    } else if (mechanics.furniture) {
+      // TODO: Handle Furniture Conversion
     }
   }
 
