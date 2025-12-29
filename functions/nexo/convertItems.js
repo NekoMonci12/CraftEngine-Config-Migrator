@@ -48,7 +48,7 @@ function convertNexoToCraft(itemData, namespace, cmdTracker = {}, cmdConflicts =
 
     const sanitizePath = (path) => path ? path.replace(/\.[^/.]+$/, "") : path
 
-    if (pack.generate_model === false) {
+    if (pack.custom_model_data && pack.model) {
       // 3D item
       craftItems.items[`${namespace}:${key}`] = {
         'custom-model-data': cmd,
