@@ -78,7 +78,7 @@ function getCustomModelData(namespace, itemKey, material, explicitModelId, cache
  * Convert ItemsAdder item data to CraftEngine format
  * Supports 3D items with model_path, 2D items with textures, and custom armor
  */
-function convertItemsAdderToCraft(itemData, namespace, cmdTracker = {}, cmdConflicts = {}, cache = {}, generatedIds = {}) {
+function convertItemsAdderToCraft(itemData, namespace, cmdTracker = {}, cmdConflicts = {}, cache = {}, generatedIds = {}, knownNamespaces = new Set()) {
   const craftItems = { items: {} }
 
   for (const key in itemData) {
@@ -93,6 +93,20 @@ function convertItemsAdderToCraft(itemData, namespace, cmdTracker = {}, cmdConfl
     const explicitModelId = resource.model_id
 
     const sanitizePath = (path) => path ? path.replace(/\.[^/.]+$/, "") : path
+    const withNamespaceFallback = (value, defaultNamespace) => {
+      const cleanPath = sanitizePath(value)
+      if (!cleanPath) return cleanPath
+      if (cleanPath.includes(':')) return cleanPath
+      const slashIndex = cleanPath.indexOf('/')
+      if (slashIndex > 0) {
+        const candidateNamespace = cleanPath.substring(0, slashIndex)
+        const candidatePath = cleanPath.substring(slashIndex + 1)
+        if (knownNamespaces.has(candidateNamespace) && candidatePath) {
+          return `${candidateNamespace}:${candidatePath}`
+        }
+      }
+      return defaultNamespace ? `${defaultNamespace}:${cleanPath}` : `minecraft:${cleanPath}`
+    }
 
     // Temporarily exclude custom armor items from conversion.
     if (specificProps.armor) {
@@ -129,7 +143,7 @@ function convertItemsAdderToCraft(itemData, namespace, cmdTracker = {}, cmdConfl
 
     // Handle 3D items with model_path
     if (modelPath && !generate) {
-      craftItem.model = { type: 'minecraft:model', path: namespace + ':' + sanitizePath(modelPath) }
+      craftItem.model = { type: 'minecraft:model', path: withNamespaceFallback(modelPath, namespace) }
       craftItems.items[`${namespace}:${key}`] = craftItem
     }
     // Handle 2D items with textures (generated)
@@ -137,13 +151,13 @@ function convertItemsAdderToCraft(itemData, namespace, cmdTracker = {}, cmdConfl
       const texturePath = sanitizePath(textures[0])
       craftItem.model = { 
         template: `${namespace}:model/simplified_generated`, 
-        arguments: { path: namespace + ':' + texturePath } 
+        arguments: { path: withNamespaceFallback(texturePath, namespace) } 
       }
       craftItems.items[`${namespace}:${key}`] = craftItem
     }
     // Handle items with model_path but generate=true
     else if (modelPath) {
-      craftItem.model = { type: 'minecraft:model', path: namespace + ':' + sanitizePath(modelPath) }
+      craftItem.model = { type: 'minecraft:model', path: withNamespaceFallback(modelPath, namespace) }
       craftItems.items[`${namespace}:${key}`] = craftItem
     }
     else {
@@ -230,6 +244,20 @@ function convertAllFiles(inputFolder, outputFolder, namespace) {
   const cachedIds = loadCachedIds(inputFolder)
   const generatedIds = {}
 
+  // Collect known resource namespaces from common ItemsAdder v3 asset roots.
+  const knownNamespaces = new Set()
+  ;[
+    path.join(inputFolder, 'resource_pack', 'assets'),
+    path.join(inputFolder, 'resourcepack', 'assets'),
+    path.join(inputFolder, 'data', 'resource_pack', 'assets'),
+    path.join(inputFolder, 'data', 'resourcepack', 'assets')
+  ].forEach(assetsFolder => {
+    if (!fs.existsSync(assetsFolder)) return
+    fs.readdirSync(assetsFolder, { withFileTypes: true })
+      .filter(d => d.isDirectory())
+      .forEach(d => knownNamespaces.add(d.name))
+  })
+
   const folderBlacklist = []
 
   const files = getYamlFilesRecursive(itemsPacksFolder, folderBlacklist)
@@ -290,7 +318,7 @@ function convertAllFiles(inputFolder, outputFolder, namespace) {
       }
 
       // Convert items
-      const craftData = convertItemsAdderToCraft(filteredData, fileNamespace, cmdTracker, cmdConflicts, cachedIds, generatedIds)
+      const craftData = convertItemsAdderToCraft(filteredData, fileNamespace, cmdTracker, cmdConflicts, cachedIds, generatedIds, knownNamespaces)
       writeYaml(outputPath, craftData)
       loggerItemsAdder('info', `Wrote CraftEngine items to: ${outputPath}`)
 
