@@ -94,6 +94,12 @@ function convertItemsAdderToCraft(itemData, namespace, cmdTracker = {}, cmdConfl
 
     const sanitizePath = (path) => path ? path.replace(/\.[^/.]+$/, "") : path
 
+    // Temporarily exclude custom armor items from conversion.
+    if (specificProps.armor) {
+      loggerItemsAdder('info', `Skipping armor item '${namespace}:${key}'`)
+      continue
+    }
+
     // Get custom model data (from explicit, cache, or generate)
     const cmd = getCustomModelData(namespace, key, material, explicitModelId, cache, generatedIds)
 
@@ -132,15 +138,6 @@ function convertItemsAdderToCraft(itemData, namespace, cmdTracker = {}, cmdConfl
       craftItem.model = { 
         template: `${namespace}:model/simplified_generated`, 
         arguments: { path: namespace + ':' + texturePath } 
-      }
-      craftItems.items[`${namespace}:${key}`] = craftItem
-    }
-    // Handle custom armor
-    else if (specificProps.armor) {
-      // Custom armor items - just mark them as armor (Craft Engine handles armor differently)
-      craftItem.model = { 
-        template: `${namespace}:model/simplified_generated`, 
-        arguments: { path: textures && textures.length > 0 ? namespace + ':' + sanitizePath(textures[0]) : `${namespace}:${namespace}/${key}` } 
       }
       craftItems.items[`${namespace}:${key}`] = craftItem
     }
