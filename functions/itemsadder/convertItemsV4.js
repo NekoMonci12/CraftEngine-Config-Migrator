@@ -355,10 +355,8 @@ function convertAllFiles(inputFolder, outputFolder, namespace) {
     }
 
     // Convert items
-    const craftData = convertItemsAdderToCraft(filteredData, packNamespace, cmdTracker, cmdConflicts, cachedIds, generatedIds)
-    
     const outputPath = path.join(outputFolder, 'configuration', 'items', packNamespace, `${packName}.yml`)
-        const craftData = convertItemsAdderToCraft(filteredData, packNamespace, cmdTracker, cmdConflicts, cachedIds, generatedIds, knownNamespaces)
+    const craftData = convertItemsAdderToCraft(filteredData, packNamespace, cmdTracker, cmdConflicts, cachedIds, generatedIds, knownNamespaces)
     writeYaml(outputPath, craftData)
     loggerItemsAdderV4('info', `Wrote CraftEngine items to: ${outputPath}`)
 
