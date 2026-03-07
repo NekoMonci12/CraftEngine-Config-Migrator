@@ -123,7 +123,7 @@ function convertItemsAdderToCraft(itemData, namespace, cmdTracker = {}, cmdConfl
 
     // Handle 3D items with model_path
     if (modelPath && !generate) {
-      craftItem.model = { type: 'minecraft:model', path: sanitizePath(modelPath) }
+      craftItem.model = { type: 'minecraft:model', path: namespace + ':' + sanitizePath(modelPath) }
       craftItems.items[`${namespace}:${key}`] = craftItem
     }
     // Handle 2D items with textures (generated)
@@ -131,7 +131,7 @@ function convertItemsAdderToCraft(itemData, namespace, cmdTracker = {}, cmdConfl
       const texturePath = sanitizePath(textures[0])
       craftItem.model = { 
         template: `${namespace}:model/simplified_generated`, 
-        arguments: { path: texturePath } 
+        arguments: { path: namespace + ':' + texturePath } 
       }
       craftItems.items[`${namespace}:${key}`] = craftItem
     }
@@ -140,13 +140,13 @@ function convertItemsAdderToCraft(itemData, namespace, cmdTracker = {}, cmdConfl
       // Custom armor items - just mark them as armor (Craft Engine handles armor differently)
       craftItem.model = { 
         template: `${namespace}:model/simplified_generated`, 
-        arguments: { path: textures && textures.length > 0 ? sanitizePath(textures[0]) : `${namespace}/${key}` } 
+        arguments: { path: textures && textures.length > 0 ? namespace + ':' + sanitizePath(textures[0]) : `${namespace}:${namespace}/${key}` } 
       }
       craftItems.items[`${namespace}:${key}`] = craftItem
     }
     // Handle items with model_path but generate=true
     else if (modelPath) {
-      craftItem.model = { type: 'minecraft:model', path: sanitizePath(modelPath) }
+      craftItem.model = { type: 'minecraft:model', path: namespace + ':' + sanitizePath(modelPath) }
       craftItems.items[`${namespace}:${key}`] = craftItem
     }
     else {

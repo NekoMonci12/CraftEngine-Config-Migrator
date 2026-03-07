@@ -129,6 +129,9 @@ function convertAssets(inputFolder, outputFolder) {
 
   loggerItemsAdderV4Assets('info', `Found ${packFolders.length} packs to process for assets.`)
 
+  // Merged sounds object for combining all sounds.json files
+  const mergedSounds = {}
+
   // Copy assets from each pack
   packFolders.forEach(packFolder => {
     const packName = path.basename(packFolder)
@@ -154,21 +157,23 @@ function convertAssets(inputFolder, outputFolder) {
 
       // Copy models to minecraft namespace
       if (fs.existsSync(modelsFolder)) {
-        const minecraftModelsFolder = path.join(destFolder, 'minecraft', 'models', 'item')
+        const minecraftModelsFolder = path.join(destFolder, 'minecraft', 'models')
         copyFolderRecursive(modelsFolder, minecraftModelsFolder, blacklist, whitelist)
         loggerItemsAdderV4Assets('info', `Copied models from ${namespace} to minecraft namespace`)
       }
 
-      // Copy textures to original namespace (models reference them with namespace prefix)
+      // Copy textures to minecraft namespace
       if (fs.existsSync(texturesFolder)) {
-        const destTexturesFolder = path.join(destFolder, namespace, 'textures')
-        copyFolderRecursive(texturesFolder, destTexturesFolder, blacklist, whitelist)
+        const minecraftTexturesFolder = path.join(destFolder, 'minecraft', 'textures')
+        copyFolderRecursive(texturesFolder, minecraftTexturesFolder, blacklist, whitelist)
+        loggerItemsAdderV4Assets('info', `Copied textures from ${namespace} to minecraft namespace`)
       }
 
-      // Copy sounds to original namespace
+      // Copy sounds to minecraft namespace
       if (fs.existsSync(soundsFolder)) {
-        const destSoundsFolder = path.join(destFolder, namespace, 'sounds')
-        copyFolderRecursive(soundsFolder, destSoundsFolder, blacklist, whitelist)
+        const minecraftSoundsFolder = path.join(destFolder, 'minecraft', 'sounds')
+        copyFolderRecursive(soundsFolder, minecraftSoundsFolder, blacklist, whitelist)
+        loggerItemsAdderV4Assets('info', `Copied sounds from ${namespace} to minecraft namespace`)
       }
 
       // Copy any other folders (optifine, font, etc.) to original namespace
@@ -189,16 +194,53 @@ function convertAssets(inputFolder, outputFolder) {
         const ext = path.extname(file.name).toLowerCase()
         if (whitelist.includes(ext)) {
           const srcPath = path.join(namespaceFolder, file.name)
-          const destPath = path.join(destFolder, namespace, file.name)
-          fs.mkdirSync(path.dirname(destPath), { recursive: true })
-          fs.copyFileSync(srcPath, destPath)
-          loggerItemsAdderV4Assets('info', `Copied file: ${srcPath} -> ${destPath}`)
+          
+          // Special handling for sounds.json - modify namespace references to minecraft
+          if (file.name === 'sounds.json') {
+            try {
+              const soundsData = JSON.parse(fs.readFileSync(srcPath, 'utf8'))
+              
+              // Replace all namespace references in sound paths with minecraft:
+              for (const soundKey in soundsData) {
+                if (soundsData[soundKey].sounds && Array.isArray(soundsData[soundKey].sounds)) {
+                  soundsData[soundKey].sounds = soundsData[soundKey].sounds.map(soundPath => {
+                    if (typeof soundPath === 'string') {
+                      // Replace "namespace:path" with "minecraft:path"
+                      return soundPath.replace(/^[^:]+:/, 'minecraft:')
+                    }
+                    return soundPath
+                  })
+                }
+                
+                // Merge into the accumulated sounds object
+                mergedSounds[soundKey] = soundsData[soundKey]
+              }
+              
+              loggerItemsAdderV4Assets('info', `Processed sounds.json from ${namespace} (${Object.keys(soundsData).length} sounds)`)
+            } catch (error) {
+              loggerItemsAdderV4Assets('error', `Failed to process sounds.json from ${namespace}: ${error.message}`)
+            }
+          } else {
+            // Copy other files to original namespace
+            const destPath = path.join(destFolder, namespace, file.name)
+            fs.mkdirSync(path.dirname(destPath), { recursive: true })
+            fs.copyFileSync(srcPath, destPath)
+            loggerItemsAdderV4Assets('info', `Copied file: ${srcPath} -> ${destPath}`)
+          }
         }
       })
     })
   })
 
   loggerItemsAdderV4Assets('info', `Resource pack assets copied to: ${destFolder}`)
+  // Write merged sounds.json to minecraft namespace
+  if (Object.keys(mergedSounds).length > 0) {
+    const soundsPath = path.join(destFolder, 'minecraft', 'sounds.json')
+    fs.mkdirSync(path.dirname(soundsPath), { recursive: true })
+    fs.writeFileSync(soundsPath, JSON.stringify(mergedSounds, null, 2), 'utf8')
+    loggerItemsAdderV4Assets('info', `Wrote merged sounds.json with ${Object.keys(mergedSounds).length} total sounds to minecraft namespace`)
+  }
+
   generateTextureAtlas(outputFolder)
 }
 
