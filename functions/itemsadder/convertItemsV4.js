@@ -99,9 +99,9 @@ function convertItemsAdderToCraft(itemData, namespace, cmdTracker = {}, cmdConfl
       const slashIndex = cleanPath.indexOf('/')
       if (slashIndex > 0) {
         const candidateNamespace = cleanPath.substring(0, slashIndex)
-        const candidatePath = cleanPath.substring(slashIndex + 1)
-        if (knownNamespaces.has(candidateNamespace) && candidatePath) {
-          return `${candidateNamespace}:${candidatePath}`
+        if (knownNamespaces.has(candidateNamespace)) {
+          // Keep the full path including the namespace folder
+          return `${candidateNamespace}:${cleanPath}`
         }
       }
       return defaultNamespace ? `${defaultNamespace}:${cleanPath}` : `minecraft:${cleanPath}`
