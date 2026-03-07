@@ -58,35 +58,51 @@ function copyFolderRecursive(src, dest, blacklist = [], whitelist = []) {
 }
 
 /**
- * Generate atlas JSON for all folders under "resourcepack/assets/minecraft/textures"
+ * Generate atlas JSON for all namespaces with textures
  * @param {string} outputFolder - Root output folder
  */
 function generateTextureAtlas(outputFolder) {
-  const texturesFolder = path.join(outputFolder, 'resourcepack', 'assets', 'minecraft', 'textures')
-  const atlasFolder = path.join(outputFolder, 'resourcepack', 'assets', 'minecraft', 'atlases')
-  const atlasFile = path.join(atlasFolder, 'blocks.json')
-
-  if (!fs.existsSync(texturesFolder)) {
-    loggerItemsAdderV4Assets('warn', `Textures folder not found: ${texturesFolder}`)
+  const assetsFolder = path.join(outputFolder, 'resourcepack', 'assets')
+  
+  if (!fs.existsSync(assetsFolder)) {
+    loggerItemsAdderV4Assets('warn', `Assets folder not found: ${assetsFolder}`)
     return
   }
 
-  fs.mkdirSync(atlasFolder, { recursive: true })
-
-  const subfolders = fs.readdirSync(texturesFolder, { withFileTypes: true })
+  // Get all namespace folders
+  const namespaces = fs.readdirSync(assetsFolder, { withFileTypes: true })
     .filter(d => d.isDirectory())
     .map(d => d.name)
 
-  const sources = subfolders.map(name => ({
-    type: 'directory',
-    source: name,
-    prefix: `${name}/`
-  }))
+  namespaces.forEach(namespace => {
+    const texturesFolder = path.join(assetsFolder, namespace, 'textures')
+    
+    if (!fs.existsSync(texturesFolder)) {
+      return // Skip if no textures folder
+    }
 
-  const atlasData = { sources }
+    const subfolders = fs.readdirSync(texturesFolder, { withFileTypes: true })
+      .filter(d => d.isDirectory())
+      .map(d => d.name)
 
-  fs.writeFileSync(atlasFile, JSON.stringify(atlasData, null, 4), 'utf8')
-  loggerItemsAdderV4Assets('info', `Generated texture atlas at: ${atlasFile}`)
+    if (subfolders.length === 0) {
+      return // Skip if no texture subfolders
+    }
+
+    const sources = subfolders.map(name => ({
+      type: 'directory',
+      source: name,
+      prefix: `${name}/`
+    }))
+
+    const atlasData = { sources }
+    const atlasFolder = path.join(assetsFolder, namespace, 'atlases')
+    const atlasFile = path.join(atlasFolder, 'blocks.json')
+
+    fs.mkdirSync(atlasFolder, { recursive: true })
+    fs.writeFileSync(atlasFile, JSON.stringify(atlasData, null, 4), 'utf8')
+    loggerItemsAdderV4Assets('info', `Generated texture atlas for ${namespace} at: ${atlasFile}`)
+  })
 }
 
 /**
@@ -144,9 +160,9 @@ function convertAssets(inputFolder, outputFolder) {
 
     loggerItemsAdderV4Assets('info', `Processing assets from pack: ${packName}`)
     
-    // Get all namespace folders in this pack's assets
+    // Get all namespace folders in this pack's assets (exclude modelengine)
     const namespaceFolders = fs.readdirSync(resourcepackFolder, { withFileTypes: true })
-      .filter(d => d.isDirectory())
+      .filter(d => d.isDirectory() && d.name !== 'modelengine')
       .map(d => d.name)
 
     namespaceFolders.forEach(namespace => {
@@ -155,25 +171,25 @@ function convertAssets(inputFolder, outputFolder) {
       const texturesFolder = path.join(namespaceFolder, 'textures')
       const soundsFolder = path.join(namespaceFolder, 'sounds')
 
-      // Copy models to minecraft namespace
+      // Copy models to original namespace
       if (fs.existsSync(modelsFolder)) {
-        const minecraftModelsFolder = path.join(destFolder, 'minecraft', 'models')
-        copyFolderRecursive(modelsFolder, minecraftModelsFolder, blacklist, whitelist)
-        loggerItemsAdderV4Assets('info', `Copied models from ${namespace} to minecraft namespace`)
+        const destModelsFolder = path.join(destFolder, namespace, 'models')
+        copyFolderRecursive(modelsFolder, destModelsFolder, blacklist, whitelist)
+        loggerItemsAdderV4Assets('info', `Copied models from ${namespace} namespace`)
       }
 
-      // Copy textures to minecraft namespace
+      // Copy textures to original namespace
       if (fs.existsSync(texturesFolder)) {
-        const minecraftTexturesFolder = path.join(destFolder, 'minecraft', 'textures')
-        copyFolderRecursive(texturesFolder, minecraftTexturesFolder, blacklist, whitelist)
-        loggerItemsAdderV4Assets('info', `Copied textures from ${namespace} to minecraft namespace`)
+        const destTexturesFolder = path.join(destFolder, namespace, 'textures')
+        copyFolderRecursive(texturesFolder, destTexturesFolder, blacklist, whitelist)
+        loggerItemsAdderV4Assets('info', `Copied textures from ${namespace} namespace`)
       }
 
-      // Copy sounds to minecraft namespace
+      // Copy sounds to original namespace
       if (fs.existsSync(soundsFolder)) {
-        const minecraftSoundsFolder = path.join(destFolder, 'minecraft', 'sounds')
-        copyFolderRecursive(soundsFolder, minecraftSoundsFolder, blacklist, whitelist)
-        loggerItemsAdderV4Assets('info', `Copied sounds from ${namespace} to minecraft namespace`)
+        const destSoundsFolder = path.join(destFolder, namespace, 'sounds')
+        copyFolderRecursive(soundsFolder, destSoundsFolder, blacklist, whitelist)
+        loggerItemsAdderV4Assets('info', `Copied sounds from ${namespace} namespace`)
       }
 
       // Copy any other folders (optifine, font, etc.) to original namespace
@@ -195,24 +211,14 @@ function convertAssets(inputFolder, outputFolder) {
         if (whitelist.includes(ext)) {
           const srcPath = path.join(namespaceFolder, file.name)
           
-          // Special handling for sounds.json - modify namespace references to minecraft
+          // Special handling for sounds.json - keep in original namespace
           if (file.name === 'sounds.json') {
             try {
               const soundsData = JSON.parse(fs.readFileSync(srcPath, 'utf8'))
               
-              // Replace all namespace references in sound paths with minecraft:
+              // Merge into the accumulated sounds object with namespace prefix for keys
               for (const soundKey in soundsData) {
-                if (soundsData[soundKey].sounds && Array.isArray(soundsData[soundKey].sounds)) {
-                  soundsData[soundKey].sounds = soundsData[soundKey].sounds.map(soundPath => {
-                    if (typeof soundPath === 'string') {
-                      // Replace "namespace:path" with "minecraft:path"
-                      return soundPath.replace(/^[^:]+:/, 'minecraft:')
-                    }
-                    return soundPath
-                  })
-                }
-                
-                // Merge into the accumulated sounds object
+                // Preserve the original sound data with namespace intact
                 mergedSounds[soundKey] = soundsData[soundKey]
               }
               
