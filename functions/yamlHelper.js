@@ -23,6 +23,10 @@ function readYaml(filePath) {
  */
 function writeYaml(filePath, data) {
   try {
+    const dir = require('path').dirname(filePath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
     const yamlString = yaml.dump(data);
     fs.writeFileSync(filePath, yamlString, 'utf8');
     console.log(`YAML file written to ${filePath}`);
