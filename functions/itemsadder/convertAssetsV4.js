@@ -10,6 +10,26 @@ function loggerItemsAdderV4Assets(level, message) {
 }
 
 /**
+ * Resolve the namespace root folder for a v4 pack.
+ * Supports both resourcepack/assets/<namespace>/... and resourcepack/<namespace>/...
+ * @param {string} packFolder - Absolute path to the pack folder inside contents
+ * @returns {string|null} Namespace root folder path or null if not found
+ */
+function getNamespaceRootFolder(packFolder) {
+  const assetsFolder = path.join(packFolder, 'resourcepack', 'assets')
+  if (fs.existsSync(assetsFolder)) {
+    return assetsFolder
+  }
+
+  const resourcepackFolder = path.join(packFolder, 'resourcepack')
+  if (fs.existsSync(resourcepackFolder)) {
+    return resourcepackFolder
+  }
+
+  return null
+}
+
+/**
  * Recursively copy a folder and its contents with blacklist and whitelist
  * @param {string} src - Source folder
  * @param {string} dest - Destination folder
@@ -107,7 +127,7 @@ function generateTextureAtlas(outputFolder) {
 
 /**
  * Handle ItemsAdder v4 resource pack assets
- * Copies pack_name/resourcepack/assets -> output/resourcepack/assets
+ * Copies pack_name/resourcepack/assets or pack_name/resourcepack -> output/resourcepack/assets
  * Merges all pack assets into one output
  * @param {string} inputFolder - Root input folder
  * @param {string} outputFolder - Root output folder
@@ -151,22 +171,22 @@ function convertAssets(inputFolder, outputFolder) {
   // Copy assets from each pack
   packFolders.forEach(packFolder => {
     const packName = path.basename(packFolder)
-    const resourcepackFolder = path.join(packFolder, 'resourcepack', 'assets')
+    const namespaceRootFolder = getNamespaceRootFolder(packFolder)
 
-    if (!fs.existsSync(resourcepackFolder)) {
-      loggerItemsAdderV4Assets('warn', `No resourcepack/assets in pack: ${packName}`)
+    if (!namespaceRootFolder) {
+      loggerItemsAdderV4Assets('warn', `No resourcepack folder in pack: ${packName}`)
       return
     }
 
     loggerItemsAdderV4Assets('info', `Processing assets from pack: ${packName}`)
     
-    // Get all namespace folders in this pack's assets (exclude modelengine)
-    const namespaceFolders = fs.readdirSync(resourcepackFolder, { withFileTypes: true })
+    // Get all namespace folders (exclude modelengine)
+    const namespaceFolders = fs.readdirSync(namespaceRootFolder, { withFileTypes: true })
       .filter(d => d.isDirectory() && d.name !== 'modelengine')
       .map(d => d.name)
 
     namespaceFolders.forEach(namespace => {
-      const namespaceFolder = path.join(resourcepackFolder, namespace)
+      const namespaceFolder = path.join(namespaceRootFolder, namespace)
       const modelsFolder = path.join(namespaceFolder, 'models')
       const texturesFolder = path.join(namespaceFolder, 'textures')
       const soundsFolder = path.join(namespaceFolder, 'sounds')

@@ -19,6 +19,26 @@ function loggerSameIds(level, message) {
 }
 
 /**
+ * Resolve the namespace root folder for a v4 pack.
+ * Supports both resourcepack/assets/<namespace>/... and resourcepack/<namespace>/...
+ * @param {string} packFolder - Absolute path to the pack folder inside contents
+ * @returns {string|null} Namespace root folder path or null if not found
+ */
+function getNamespaceRootFolder(packFolder) {
+  const assetsFolder = path.join(packFolder, 'resourcepack', 'assets')
+  if (fs.existsSync(assetsFolder)) {
+    return assetsFolder
+  }
+
+  const resourcepackFolder = path.join(packFolder, 'resourcepack')
+  if (fs.existsSync(resourcepackFolder)) {
+    return resourcepackFolder
+  }
+
+  return null
+}
+
+/**
  * Load cached IDs from storage/items_ids_cache.yml
  * @param {string} inputFolder - Root input folder
  * @returns {Object} Cache object with structure: { MATERIAL: { 'namespace:item': cmd } }
@@ -253,9 +273,10 @@ function convertAllFiles(inputFolder, outputFolder, namespace) {
   const namespacePackFolders = fs.readdirSync(contentsFolder, { withFileTypes: true })
     .filter(d => d.isDirectory() && !d.name.startsWith('_'))
   namespacePackFolders.forEach(pack => {
-    const assetsFolder = path.join(contentsFolder, pack.name, 'resourcepack', 'assets')
-    if (!fs.existsSync(assetsFolder)) return
-    fs.readdirSync(assetsFolder, { withFileTypes: true })
+    const packFolder = path.join(contentsFolder, pack.name)
+    const namespaceRootFolder = getNamespaceRootFolder(packFolder)
+    if (!namespaceRootFolder) return
+    fs.readdirSync(namespaceRootFolder, { withFileTypes: true })
       .filter(d => d.isDirectory())
       .forEach(d => knownNamespaces.add(d.name))
   })
